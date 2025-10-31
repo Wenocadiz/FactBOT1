@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chat Facturación – The Anglo</title>
+<style>
+  :root { --bg:#0f172a; --panel:#111827; --bubble:#1f2937; --accent:#38bdf8; --text:#e5e7eb; --muted:#94a3b8; }
+  *{box-sizing:border-box} body{margin:0;background:linear-gradient(160deg,#0b1220,#0e1424 30%,#0b1220);font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;color:var(--text)}
+  .wrap{max-width:800px;margin:0 auto;min-height:100vh;display:grid;grid-template-rows:auto 1fr auto;gap:14px;padding:18px}
+  header{display:flex;align-items:center;gap:12px}
+  header .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#38bdf8,#06b6d4)}
+  header h1{font-size:18px;margin:0} header p{margin:0;color:var(--muted);font-size:13px}
+  .chat{background:rgba(17,24,39,.6);backdrop-filter:saturate(160%) blur(6px);border:1px solid #1f2937;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px;min-height:60vh}
+  .msgs{display:flex;flex-direction:column;gap:10px;overflow:auto;scroll-behavior:smooth}
+  .msg{max-width:78%;padding:10px 12px;border-radius:14px;line-height:1.35;font-size:14px;border:1px solid #263041;box-shadow:0 1px 0 rgba(0,0,0,.3)}
+  .bot{align-self:flex-start;background:var(--bubble)} .you{align-self:flex-end;background:#0b2533;border-color:#153445}
+  .time{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+  .inputbar{display:flex;gap:8px}
+  .inputbar input{flex:1;background:#0b1322;border:1px solid #1f2937;color:var(--text);padding:12px;border-radius:12px;font-size:14px;outline:none}
+  .inputbar button{background:var(--accent);border:none;color:#05202c;font-weight:600;padding:12px 14px;border-radius:12px;cursor:pointer}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .chip{background:#0b2533;border:1px solid #153445;color:#cfefff;font-size:12px;padding:8px 10px;border-radius:999px;cursor:pointer}
+  a{color:#7dd3fc;text-decoration:underline}
+  .kbd{background:#0b2533;border:1px solid #153445;border-radius:6px;padding:0 6px;font-size:12px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo"></div>
+      <div>
+        <h1>Asistente de Facturación</h1>
+        <p>Respuestas rápidas sobre facturación para cursos de inglés</p>
+      </div>
+    </header>
+
+    <main class="chat">
+      <div id="msgs" class="msgs" aria-live="polite"></div>
+
+      <div class="chips">
+        <button class="chip" data-q="¿Dónde genero mi factura?">¿Dónde genero mi factura?</button>
+        <button class="chip" data-q="Me equivoqué en mis datos fiscales">Me equivoqué en mis datos</button>
+        <button class="chip" data-q="No me llega mi factura">No me llega mi factura</button>
+        <button class="chip" data-q="No me deja facturar, está trabado el portal">Portal trabado</button>
+      </div>
+
+      <div class="inputbar">
+        <input id="input" type="text" placeholder="Escribe tu duda (Enter para enviar)" autocomplete="off" />
+        <button id="send" title="Enviar">Enviar</button>
+      </div>
+    </main>
+
+    <footer>
+      <small style="color:var(--muted)">Sugerencia: prueba con <span class="kbd">“dónde facturo”</span> o <span class="kbd">“refacturación”</span>.</small>
+    </footer>
+  </div>
+
+<script>
+/* -------------------- Base de conocimiento -------------------- */
+const KB = [
+  {
+    id: "donde-facturo",
+    intent: ["donde facturo","dónde facturo","donde genero mi factura","generar factura","autofacturación","auto facturacion","portal de factura","portal facturacion","facturar en línea","emitir factura"],
+    answer: `Para generar tu factura, por favor dirígete al <strong>portal de autofacturación</strong>.`
+  },
+  {
+    id: "datos-incorrectos",
+    intent: ["me equivoque datos fiscales","equivoqué en mis datos","refacturacion","refacturación","cambiar datos factura","rfc mal","dato fiscal incorrecto"],
+    answer: `Por favor envía un correo a <a href="mailto:finanzas@theanglo.mx">finanzas@theanglo.mx</a> con tu <strong>constancia fiscal</strong>, la <strong>factura que generaste</strong> y tu <strong>número de matrícula</strong>, solicitando la <strong>REFACTURACIÓN</strong>.`
+  },
+  {
+    id: "no-llega",
+    intent: ["no me llega factura","no llega mi factura","no recibo factura","reenvio factura","reenviar factura","reenvíen factura"],
+    answer: `Por favor <strong>cierra sesión y vuelve a ingresar</strong>. En tu perfil, verifica el <strong>correo electrónico vinculado</strong>; si no es correcto, actualízalo. Luego entra a <em>Mis pagos</em> &rarr; <em>Mis facturas</em> y solicita <strong>reenviar</strong> la factura a tu correo correcto.`
+  },
+  {
+    id: "portal-trabado",
+    intent: ["no me deja facturar","portal trabado","error portal","no funciona portal","no puedo usar autofacturacion","se traba facturar"],
+    answer: `Por favor envía un correo a <a href="mailto:finanzas@theanglo.mx">finanzas@theanglo.mx</a> con <strong>capturas de pantalla</strong> del error, tu <strong>matrícula</strong>, <strong>nombre completo</strong>, el <strong>curso a facturar</strong>, tus <strong>datos fiscales</strong> (con <strong>constancia fiscal actualizada</strong>) y el <strong>correo</strong> al que deseas que se envíe la factura.`
+  }
+];
+
+const FALLBACK = `Puedo ayudarte con: 
+1) Dónde generar tu factura, 
+2) Corrección de datos (refacturación), 
+3) Reenvío si no te llega, 
+4) Problemas con el portal.
+Escríbeme tu caso o usa los botones de arriba.`;
+
+/* --------- Utilidades simples de matching por palabras clave --------- */
+function normalize(t){
+  return t
+   .toLowerCase()
+   .normalize("NFD").replace(/\p{Diacritic}/gu,"")
+   .replace(/[^a-z0-9áéíóúñü\s]/gi," ")
+   .replace(/\s+/g," ")
+   .trim();
+}
+
+function findAnswer(question){
+  const q = normalize(question);
+
+  // score por coincidencias parciales
+  let best = {score:0, entry:null};
+  for(const entry of KB){
+    let score = 0;
+    for(const kw of entry.intent){
+      const nkw = normalize(kw);
+      // coincidencia completa o incluye palabras clave
+      if(q.includes(nkw)) score += 3;
+      // scoring por tokens
+      const tokens = nkw.split(" ").filter(Boolean);
+      let hits = 0;
+      for(const t of tokens){ if(q.includes(t)) hits++; }
+      score += hits * 0.6;
+    }
+    if(score > best.score){ best = {score, entry}; }
+  }
+  return (best.score >= 1.5) ? best.entry.answer : null;
+}
+
+/* -------------------- UI del chat -------------------- */
+const msgs = document.getElementById("msgs");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+
+function ts(){ return new Date().toLocaleTimeString("es-MX", {hour:"2-digit",minute:"2-digit"}); }
+
+function pushMsg(text, who="bot"){
+  const wrap = document.createElement("div");
+  wrap.className = "msg " + (who==="you"?"you":"bot");
+  wrap.innerHTML = text + `<span class="time">${ts()}</span>`;
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function handle(question){
+  if(!question.trim()) return;
+  pushMsg(esc(question), "you");
+  const answer = findAnswer(question) || FALLBACK;
+  setTimeout(()=> pushMsg(answer, "bot"), 200);
+}
+
+function esc(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+/* Eventos */
+sendBtn.addEventListener("click", ()=>{ handle(input.value); input.value=""; input.focus(); });
+input.addEventListener("keydown", (e)=>{ if(e.key==="Enter"){ handle(input.value); input.value=""; } });
+document.querySelectorAll(".chip").forEach(ch=> ch.addEventListener("click", ()=> handle(ch.dataset.q)));
+
+/* Mensaje de bienvenida */
+pushMsg(`¡Hola! Soy tu asistente de facturación. ¿En qué te ayudo hoy?
+• “¿Dónde genero mi factura?”
+• “Me equivoqué en mis datos fiscales”
+• “No me llega mi factura”
+• “No me deja facturar, está trabado el portal”`);
+</script>
+</body>
+</html>
